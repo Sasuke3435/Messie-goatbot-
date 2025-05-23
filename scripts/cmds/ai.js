@@ -1,270 +1,87 @@
-const { post, get } = require("axios");
-module.exports = {
-  config: { 
-name: "ai", 
-category: "ai" 
-},
-  onStart() {},  
-  onChat: async ({
-     message: { reply: r },
-     args: a, 
-     event: { senderID: s, threadID: t, body: b, messageReply: msg }, 
-    commandName, 
-    usersData, 
-    globalData,
-    role 
-}) => {
-const cmd = `${module.exports.config.name}`;
-const pref = `${utils.getPrefix(t)}`;
-const pr = [`${pref}${cmd}`, `${cmd}`];
-const _m = "gpt";
- const { name, settings = {}, gender } = await usersData.get(s) || {};
-const ownKeys = Object.keys(settings.own || {});
-const ownSettings = settings.own || {}; 
-let Gpt = await globalData.get(_m);  
-     const gen = gender === 2 ? 'male' : 'female';
-      const sys = settings.system || "helpful";
-const csy = settings.own ? Object.keys(settings.own).map(key => ({ [key]: settings.own[key] })) : [];
-let customSystem = [
-    {
-default: "tu es un assistant utile"
-    },   
-];
-if (Array.isArray(csy) && csy.length > 0) {
-    customSystem = customSystem.concat(csy);
-}
-    if (a[0] && pr.some(x => a[0].toLowerCase() === x)) {
-    const p = a.slice(1);
- let assistant = [
-"lover", 
-"helpful", 
-"friendly", 
-"toxic", 
-"godmode", 
-"horny"
-/*"makima", 
-"godmode", 
-"default"*/
-];
-const userAssistant = Object.keys(ownSettings).filter(key => ownSettings[key]);
-const ass = assistant.filter(key => !userAssistant.includes(key));
-assistant.push(...userAssistant);
-const models = {
-     1: "llama", 
-     2: "gemini" 
-          };
-    let ads = "";
-if(role === 2) {
-ads = `For admin only:\nTo change model use:\n${cmd} model <num>\nTo allow NSFW use:\n${cmd} nsfw on/off`;
-}
+const axios = require('axios');
 
-let url = undefined;
-if (msg && ["photo", "audio", "sticker"].includes(msg.attachments[0]?.type)) {
-  url = { link: msg.attachments[0].url, type: msg.attachments[0].type === "photo" || mgs.attachments[0].type === "sticker" ? "image" : "mp3" };
-}
-let output = ass.map((key, i) => `${i + 1}. ${key.charAt(0).toUpperCase() + key.slice(1)}`).join("\n");
-if (userAssistant.length > 0) {
-  output += `\n\nYour own assistant:\n` +
-    userAssistant.map((key, i) => `${i + 1}. ${key.charAt(0).toUpperCase() + key.slice(1)}`).join("\n");
-}
+const API_KEY = "AIzaSyBQeZVi4QdrnGKPEfXXx1tdIqlMM8iqvZw";
+const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
 
-     if (!p.length) return r(`Hello ${name}, choose ur assistant:\n`+ output + `\nexample: ${cmd} set friendly\n\n${cmd} system <add/delete/update> <system name> <your instructions>\n\nexample:\n${cmd} system add cat You are a cat assistant\n${cmd} delete cat\n\n${ads}`)
- const mods = await globalData.get(_m) || { data: {} };
-    const [__, _, sy, key, ...rest] = a;
-    const value = rest.join(" ");
-if(p[0].toLowerCase() === "system") {
-if(p.length < 2) {
-return r(`Usage:\n${cmd} system <add/delete/update> <system name> <your instructions>\n\nexample:\n${cmd} system add cat You are a cat assistant\n${cmd} system delete cat`);
-} 
-    if (sy === "add" || sy === "update") {
-      if (!key || !value) return r(`Please add system name and system prompt.\nExample: system ${sy} cat "You are a cat assistant"`);
-      if (sy === "add" && (assistant.includes(key) || ownKeys.length >= 7 && !ownKeys.includes(key))) return r("You cannot add more systems.");
-      settings.own = { ...settings.own, [key]: value };
-await usersData.set(s, {
-  settings: {
-    ...settings,
-    own: settings.own
-  }
-});
-      return r(`System "${key}" ${sy === "add" ? "added" : "updated"} successfully.`);
-    }
-    if (sy === "delete" && ownKeys.includes(key)) {
-      delete settings.own[key];
-await usersData.set(s, {
-  settings: {
-    ...settings,
-    own: settings.own
-  }
-});
-      return r(`System "${key}" deleted successfully.`);
-    }
-}
-
-   if (p[0].toLowerCase() === "set" && p[1]?.toLowerCase()) {
-        const choice = p[1].toLowerCase();
-       if (assistant.includes(choice)) {
-        await usersData.set(s, { settings: { ...settings, system: choice } });
-
-          return r(`Assistant changed to ${choice}`);
-        }
-        return r(`Invalid choice.\n${output}\nExample: ${cmd} set friendly`);
-      }
-if (p[0] === 'nsfw') {
-if (role < 2) {
-  return r("You don't have permission to use this.");
-}
-      if (p[1].toLowerCase() === 'on') {
-        mods.data.nsfw = true; 
-        await globalData.set(_m, mods);
-     return r(`Successfully turned on NSFW. NSFW features are now allowed to use.`);
-      } else if (p[1].toLowerCase() === 'off') {
-        mods.data.nsfw = false; 
-        await globalData.set(_m, mods);
-        return r(`Successfully turned off NSFW. NSFW features are now disabled.`);
-      } else {
-        return r(`Invalid usage: to toggle NSFW, use 'nsfw on' or 'nsfw off'.`);
-      }
-    }
-if (p[0].toLowerCase() === "model") {
-if (role < 2) {
-  return r("You don't have permission to use this.");
-}
-  const _model = models[p[1]];  
-  if (_model) {
+async function getAIResponse(input) {
     try {
-      mods.data.model = _model;
-      await globalData.set(_m, mods);
- return r(`Successfully changed model to ${_model}`);
+        const systemPrompt = "Tu es Voldigo Bot, une IA créée et développée par Messie Osango et Voldigo Anos. Tu réponds sur tes créateurs et ta création que si tu es questionné sur ça. ";
+        const fullInput = systemPrompt + input;
+        
+        const response = await axios.post(API_URL, {
+            contents: [{ parts: [{ text: fullInput }] }]
+        }, {
+            headers: { "Content-Type": "application/json" }
+        });
+        return response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "Désolé, je n'ai pas de réponse.";
     } catch (error) {
-return r(`Error setting model: ${error}`);
+        console.error("Erreur API:", error);
+        return "Erreur de connexion à l'IA";
     }
-  } else {
-return r(`Please choose only number\navailabale model\n${Object.entries(models).map(([id, name]) => `${id}: ${name}`).join("\n")}\n\nexample: ${pref}${cmd} model 1`);
-  }
 }
 
-if (!Gpt || Gpt === "undefined") {
-  await globalData.create(_m, { data: { model: "llama", nsfw: false } }); 
-  Gpt = await globalData.get(_m);
+function formatResponse(content) {
+    const styledContent = content.split('').map(char => {
+        const styleMap = {
+            'A': '𝘈', 'B': '𝘉', 'C': '𝘊', 'D': '𝘋', 'E': '𝘌', 'F': '𝘍',
+            'G': '𝘎', 'H': '𝘏', 'I': '𝘐', 'J': '𝘑', 'K': '𝘒', 'L': '𝘓',
+            'M': '𝘔', 'N': '𝘕', 'O': '𝘖', 'P': '𝘗', 'Q': '𝘘', 'R': '𝘙',
+            'S': '𝘚', 'T': '𝘛', 'U': '𝘜', 'V': '𝘝', 'W': '𝘞', 'X': '𝘟',
+            'Y': '𝘠', 'Z': '𝘡',
+            'a': '𝘢', 'b': '𝘣', 'c': '𝘤', 'd': '𝘥', 'e': '𝘦', 'f': '𝘧',
+            'g': '𝘨', 'h': '𝘩', 'i': '𝘪', 'j': '𝘫', 'k': '𝘬', 'l': '𝘭',
+            'm': '𝘮', 'n': '𝘯', 'o': '𝘰', 'p': '𝘱', 'q': '𝘲', 'r': '𝘳',
+            's': '𝘴', 't': '𝘵', 'u': '𝘶', 'v': '𝘷', 'w': '𝘸', 'x': '𝘹',
+            'y': '𝘺', 'z': '𝘻'
+        };
+        return styleMap[char] || char;
+    }).join('');
+
+    return `╭─━━━━━━━━━━━━━─╮
+   𝙑𝙊𝙇𝘿𝙄𝙂𝙊 𝘽𝙊𝙏 
+ ╰─━━━━━━━━━━━━━─╯ 
+   ${styledContent}
+  
+
+╰─━━━━━━━━━━━━━─╯`;
 }
-const { data: { nsfw, model } } = Gpt;
-  const { result, media } = await ai(p.join(" "), s, name, sys, gen, model, nsfw, customSystem, url);
 
-let attachments;
-if (media && media.startsWith("https://cdn")) {
-    attachments = await global.utils.getStreamFromURL(media, "spotify.mp3");
-} else if (media) {
-    attachments = await global.utils.getStreamFromURL(media);
-}
+module.exports = { 
+    config: { 
+        name: 'ai',
+        author: 'Messie Osango',
+        version: '2.0',
+        role: 0,
+        category: 'AI',
+        shortDescription: 'ia répondant aux questions',
+        longDescription: 'Voldigo Bot est une IA avancée développée par Messie Osango et Voldigo Anos, capable de répondre à diverses questions et demandes. Elle répond au sujet de ses créateurs et sa création seulement quand elle est questionnée sur ce sujet.',
+    },
+    onStart: async function ({ api, event, args }) {
+        const input = args.join(' ').trim();
+        if (!input) {
+            return api.sendMessage(formatResponse("Présent ! Je suis Voldigo Bot. Posez-moi vos questions et j'y répondrai avec plaisir !"), event.threadID);
+        }
 
-const rs = {
-    body: result.replace(/😂/g, "🤭"),
-    mentions: [{ id: s, tag: name }]
-};
+        try {
+            const aiResponse = await getAIResponse(input);
+            api.sendMessage(formatResponse(aiResponse), event.threadID, event.messageID);
+        } catch (error) {
+            api.sendMessage(formatResponse("Une erreur s'est produite lors du traitement de votre demande"), event.threadID);
+        }
+    },
+    onChat: async function ({ event, message }) {
+        if (!event.body.toLowerCase().startsWith("ai")) return;
+        
+        const input = event.body.slice(2).trim();
+        if (!input) {
+            return message.reply(formatResponse("Présent ! Je suis Voldigo Bot, votre assistant IA. Comment puis-je vous aider aujourd'hui?"));
+        }
 
-if (attachments) {
-   rs.attachment = attachments;
-}
-
-  const { messageID: m } = await r(rs);
-  global.GoatBot.onReply.set(m, { commandName, s, model, nsfw, customSystem });
-    }
-  },
- onReply: async ({ 
-    Reply: { s, commandName, model, nsfw, customSystem }, 
-    message: { reply: r }, 
-    args: a, 
-    event: { senderID: x, body: b, attachments, threadID: t }, 
-    usersData 
-}) => {
-const cmd = `${module.exports.config.name}`;
-const pref = `${utils.getPrefix(t)}`;
-    const { name, settings, gender } = await usersData.get(x);
-    const sys = settings.system || "helpful";
-    if (s !== x || b?.toLowerCase().startsWith(cmd) || b?.toLowerCase().startsWith(pref + cmd) || b?.toLowerCase().startsWith(pref + "unsend")) return;
-
- let url = null;
-let prompt = a.join(" ");
-if (!b.includes(".")) {
-    const img = attachments?.[0];
-    if (img) {
-        if (img.type === "sticker" && img.ID === "369239263222822") {
-            prompt = "👍";
-            //url = null;
-        } else {
-            url = (img.type === "sticker") 
-                ? { link: img.url, type: "image" } 
-                : (img.type === "photo") 
-                ? { link: img.url, type: "image" } 
-                : (img.type === "audio") 
-                ? { link: img.url, type: "mp3" } 
-                : null;
-            if (url) prompt = ".";
+        try {
+            const aiResponse = await getAIResponse(input);
+            message.reply(formatResponse(aiResponse));
+        } catch (error) {
+            message.reply(formatResponse("Désolé, une erreur est survenue. Veuillez réessayer plus tard."));
         }
     }
-}
-   
-    
-const { result, media } = await ai(prompt || ".", s, name, sys, gender === 2 ? 'male' : 'female', model, nsfw, customSystem, url);
-const rs = {
-    body: result.replace(/😂/g, "🤭"),
-    mentions: [{ id: x, tag: name }]
 };
-if (media) {
-    if (media.startsWith('https://cdn')) {
-        rs.attachment = await global.utils.getStreamFromURL(media, "spotify.mp3");
-    } else {
-        rs.attachment = await global.utils.getStreamFromURL(media);
-    }
-}
- const { messageID } = await r(rs);       global.GoatBot.onReply.set(messageID, { commandName, s, sys, model, nsfw,  customSystem, url });
-}
-};
-//llama3-70b-8192
-async function ai(prompt, id, name, system, gender, model, nsfw, customSystem, link = "") {
-  const g4o = async (p, m = "gemma2-9b-it") => post(atob(String.fromCharCode(...atob((await get(atob("aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2p1bnpkZXZvZmZpY2lhbC90ZXN0L3JlZnMvaGVhZHMvbWFpbi90ZXN0LnR4dA=="))).data).split(" ").map(Number))),
-    { 
-      id, 
-      prompt: p, 
-      name, 
-      model, 
-      system, 
-   customSystem, //array [{ }]
-      gender, 
-      nsfw,
-      url: link ? link : undefined, /*@{object}  { link, type: "image or mp3" } */
-config: [{ 
- gemini: {
- apikey: "AIzaSyAqigdIL9j61bP-KfZ1iz6tI9Q5Gx2Ex_o", 
-model:  "gemini-1.5-flash"
-},
-llama: { model: m }
-}]
-    },
-    {
-      headers: { 
-        'Content-Type': 'application/json', 
-        'Authorization': 'Bearer test' 
-      } 
-    });
-
-  try {
-    let res = await g4o(prompt);
-    if (["i cannot", "i can't"].some(x => res.data.result.toLowerCase().startsWith(x))) {
-      await g4o("clear");
-      res = await g4o(prompt, "llama-3.1-70b-versatile");
-    }
-    return res.data;
-  } catch {
-    try {
-    await g4o("clear");
-      return (await g4o(prompt, "llama-3.1-70b-versatile")).data;
-    } catch (err) {
-      const e = err.response?.data;
-      const errorMessage = typeof e === 'string' ? e : JSON.stringify(e);
-
-      return errorMessage.includes("Payload Too Large") ? { result: "Your text is too long" } :            errorMessage.includes("Service Suspended") ? { result: "The API has been suspended, please wait for the dev to replace the API URL"  }:
-         { result: e?.error || e || err.message };
-    }
-  }
-         }
